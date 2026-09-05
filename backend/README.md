@@ -2,9 +2,21 @@
 
 FastAPI backend for the FinAlly AI Trading Workstation.
 
+## Running the API
+
+```bash
+uv run uvicorn app.main:app --reload --port 8000
+```
+
+Starts the market data source (simulator by default, or Massive if `MASSIVE_API_KEY` is set) and serves:
+
+- `GET /api/health` - health check
+- `GET /api/stream/prices` - SSE stream of live price updates
+
 ## Structure
 
 - `app/` - Application code
+  - `main.py` - FastAPI app: lifespan-managed market data source, health check, SSE routing
   - `market/` - Market data subsystem
     - `models.py` - PriceUpdate dataclass
     - `cache.py` - Thread-safe price cache

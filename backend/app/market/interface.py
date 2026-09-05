@@ -55,3 +55,24 @@ class MarketDataSource(ABC):
     @abstractmethod
     def get_tickers(self) -> list[str]:
         """Return the current list of actively tracked tickers."""
+
+    # --- Shared helpers ---
+
+    @staticmethod
+    def normalize_ticker(ticker: str) -> str:
+        """Canonical ticker form: stripped, upper case.
+
+        Every implementation must apply this in start(), add_ticker() and
+        remove_ticker(). Skipping it lets "aapl", " AAPL " and "AAPL" become
+        three separate cache keys, so a ticker added through the watchlist API
+        can never be removed again.
+        """
+        return ticker.strip().upper()
+
+    @classmethod
+    def _normalize_all(cls, tickers: list[str]) -> list[str]:
+        """Normalize a list, dropping duplicates but preserving order."""
+        seen: dict[str, None] = {}
+        for ticker in tickers:
+            seen.setdefault(cls.normalize_ticker(ticker), None)
+        return list(seen)

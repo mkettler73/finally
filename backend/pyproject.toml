@@ -8,7 +8,7 @@ dependencies = [
     "fastapi>=0.115.0",
     "uvicorn[standard]>=0.32.0",
     "numpy>=2.0.0",
-    "massive>=1.0.0",
+    "massive>=2.2.0",  # v2 model names: sip_timestamp, prev_day
     "rich>=13.0.0",
 ]
 
@@ -33,6 +33,7 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
+addopts = ["--strict-markers", "--strict-config"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 

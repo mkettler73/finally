@@ -101,3 +101,10 @@ class TestPriceCache:
         cache = PriceCache()
         update = cache.update("AAPL", 190.12345)
         assert update.price == 190.12
+
+    def test_zero_timestamp_is_preserved(self):
+        """`timestamp or time.time()` would silently rewrite 0.0 to now,
+        masking exactly the kind of unit-conversion bug that motivates it."""
+        cache = PriceCache()
+        update = cache.update("AAPL", 190.0, timestamp=0.0)
+        assert update.timestamp == 0.0

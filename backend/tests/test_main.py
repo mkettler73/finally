@@ -1,7 +1,16 @@
-"""Tests for the FastAPI app wiring: lifespan, health check, and SSE routing."""
+"""Tests for the FastAPI app wiring: lifespan, health check, and SSE routing.
+
+NOTE: do not try to consume /api/stream/prices through TestClient. Its blocking
+portal never returns headers for an unbounded stream, so the call hangs rather
+than failing. The generator is tested directly in tests/market/test_stream.py;
+the live endpoint is covered by the Playwright E2E suite.
+"""
+
+from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
+from massive.rest.models import TickerSnapshot
 
 
 @pytest.fixture
@@ -54,3 +63,42 @@ def test_uses_simulator_when_no_massive_key(client, monkeypatch):
     from app.market.simulator import SimulatorDataSource
 
     assert isinstance(test_client.app.state.market_source, SimulatorDataSource)
+
+
+def test_stream_route_is_registered_exactly_once(client):
+    """A module-scope router would accumulate duplicate, cache-shadowing routes."""
+    test_client, _ = client
+    paths = [r.path for r in test_client.app.routes if r.path.startswith("/api/stream")]
+    assert paths == ["/api/stream/prices"]
+
+
+def test_massive_source_fills_the_cache_end_to_end(monkeypatch):
+    """Regression: the client used to read LastTrade.timestamp, which does not
+    exist, so every snapshot was skipped and the cache stayed empty forever."""
+    monkeypatch.setenv("MASSIVE_API_KEY", "test-key")
+
+    import importlib
+
+    from app import main as main_module
+
+    importlib.reload(main_module)
+
+    def fake_snapshots(self):
+        return [
+            TickerSnapshot.from_dict(
+                {"ticker": t, "lastTrade": {"p": 190.5, "t": 1605192894630916600}}
+            )
+            for t in self._tickers
+        ]
+
+    with patch("app.market.massive_client.RESTClient", MagicMock()):
+        with patch(
+            "app.market.massive_client.MassiveDataSource._fetch_snapshots",
+            fake_snapshots,
+        ):
+            with TestClient(main_module.app) as test_client:
+                cache = test_client.app.state.price_cache
+                assert len(cache) == len(main_module.DEFAULT_TICKERS)
+                assert cache.get_price("AAPL") == 190.5
+                # Unix seconds, not nanoseconds.
+                assert 1_000_000_000 < cache.get("AAPL").timestamp < 3_000_000_000

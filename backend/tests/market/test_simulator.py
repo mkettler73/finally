@@ -126,6 +126,55 @@ class TestGBMSimulator:
         result = sim.step()
         price_str = str(result["AAPL"])
         # Check that we have at most 2 decimal places
-        if '.' in price_str:
-            decimal_part = price_str.split('.')[1]
+        if "." in price_str:
+            decimal_part = price_str.split(".")[1]
             assert len(decimal_part) <= 2
+
+    def test_seeded_rng_is_deterministic(self):
+        """An injectable generator lets tests assert prices, not just movement."""
+        import numpy as np
+
+        a = GBMSimulator(tickers=["AAPL", "GOOGL"], rng=np.random.default_rng(42))
+        b = GBMSimulator(tickers=["AAPL", "GOOGL"], rng=np.random.default_rng(42))
+
+        for _ in range(50):
+            assert a.step() == b.step()
+
+    def test_different_seeds_diverge(self):
+        import numpy as np
+
+        a = GBMSimulator(tickers=["AAPL"], rng=np.random.default_rng(1))
+        b = GBMSimulator(tickers=["AAPL"], rng=np.random.default_rng(2))
+
+        for _ in range(50):
+            a.step()
+            b.step()
+
+        assert a.get_price("AAPL") != b.get_price("AAPL")
+
+    def test_does_not_touch_global_numpy_state(self):
+        """A default source must not perturb the caller's np.random stream."""
+        import numpy as np
+
+        np.random.seed(7)
+        expected = np.random.standard_normal(3).tolist()
+
+        np.random.seed(7)
+        GBMSimulator(tickers=["AAPL", "GOOGL"]).step()
+        actual = np.random.standard_normal(3).tolist()
+
+        assert actual == expected
+
+    def test_non_positive_definite_matrix_degrades_to_independent_draws(self, monkeypatch):
+        """Refusing to boot is far worse than uncorrelated prices."""
+        import numpy as np
+
+        def boom(_matrix):
+            raise np.linalg.LinAlgError("not positive definite")
+
+        monkeypatch.setattr(np.linalg, "cholesky", boom)
+
+        sim = GBMSimulator(tickers=["AAPL", "GOOGL"])
+
+        assert sim._cholesky is None
+        assert set(sim.step()) == {"AAPL", "GOOGL"}  # still produces prices

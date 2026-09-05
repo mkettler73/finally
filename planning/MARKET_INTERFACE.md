@@ -316,30 +316,34 @@ table and the heatmap to be correct. The header connection indicator should say 
 
 ---
 
-## 7. Divergences in the current implementation
+## 7. Conformance of the current implementation
 
-`backend/app/market/` implements this design already. Three gaps remain, in priority
-order:
+`backend/app/market/` implements this design. The three blocking divergences
+previously listed here — `last_trade.timestamp` instead of `sip_timestamp`, a
+`/1000` divisor on a nanosecond field, and the missing `prev_day.close` fallback
+— were fixed on 2026-09-05 by extracting `_extract_price()` exactly as written in
+§6. See `MARKET_DATA_REVIEW.md` findings #1, #2 and #4.
 
-| # | Severity | Location | Issue |
-|---|---|---|---|
-| 1 | **Blocking** | `massive_client.py::_poll_once` | Reads `snap.last_trade.timestamp`. `LastTrade` has no such attribute (it is `sip_timestamp`), so every snapshot raises `AttributeError`, is caught by the surrounding `except (AttributeError, TypeError)`, and is skipped. **With a real API key the cache never fills.** |
-| 2 | High | `massive_client.py::_poll_once` | Divides the timestamp by `1000.0`. Massive trade timestamps are nanoseconds, so the divisor must be `1_000_000_000`. Fixing #1 without this yields timestamps ~31,000 years in the future. |
-| 3 | Medium | `massive_client.py::_poll_once` | No `prev_day.close` fallback. Overnight, pre-market and at weekends `last_trade` is absent, so every ticker is skipped and the watchlist renders empty. |
+Also resolved in the same pass:
 
-All three are fixed by extracting `_extract_price()` as written in §6 and calling it from
-the loop. The fix is confined to one file and one function.
+- `stream.py` now builds its `APIRouter` inside `create_stream_router()`, so
+  calling the factory twice no longer returns one shared router carrying
+  duplicate `/prices` routes bound to the first cache.
+- Ticker normalisation (obligation 5) is enforced for both sources through
+  `MarketDataSource.normalize_ticker()` / `_normalize_all()`, applied in
+  `start()`, `add_ticker()` and `remove_ticker()`.
+- The free-tier degradation described in §6 is implemented: a plan/auth refusal
+  on the first snapshot poll switches the source to `get_grouped_daily_aggs`
+  at a 900 s interval, logged once rather than every cycle.
 
-Two smaller notes:
+The parametrised interface-conformance suite called for in §10 now exists at
+`backend/tests/market/test_conformance.py` and runs every obligation in §3
+against both sources.
 
-- `SimulatorDataSource.add_ticker()` seeds the cache; `MassiveDataSource.add_ticker()`
-  does not. Documenting the asymmetry (contract obligation 2) is acceptable, but issuing
-  a targeted `get_previous_close_agg()` would make the two behave alike.
-- `stream.py` creates its `APIRouter` at module scope and mutates it inside
-  `create_stream_router()`. Calling the factory twice would register the route twice.
-  Move `router = APIRouter(...)` inside the factory.
-
----
+One documented asymmetry remains by design: `SimulatorDataSource.add_ticker()`
+seeds the cache instantly, while `MassiveDataSource.add_ticker()` cannot — the
+price appears on the next poll, up to 15 s later. This is contract obligation 2,
+and the API layer must tolerate a briefly price-less watchlist row.
 
 ## 8. Integration with FastAPI
 

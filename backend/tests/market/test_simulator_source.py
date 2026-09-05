@@ -128,11 +128,43 @@ class TestSimulatorDataSource:
         """Test creating source with custom event probability."""
         cache = PriceCache()
         # Very high event probability for testing
-        source = SimulatorDataSource(
-            price_cache=cache, update_interval=0.1, event_probability=1.0
-        )
+        source = SimulatorDataSource(price_cache=cache, update_interval=0.1, event_probability=1.0)
         await source.start(["AAPL"])
 
         # Just verify it starts and stops cleanly
         await asyncio.sleep(0.2)
+        await source.stop()
+
+    async def test_add_ticker_normalizes(self):
+        """Unnormalised input would create a second, undeletable cache key."""
+        cache = PriceCache()
+        source = SimulatorDataSource(price_cache=cache, update_interval=0.1)
+        await source.start(["AAPL"])
+
+        await source.add_ticker("  aapl  ")
+
+        assert source.get_tickers() == ["AAPL"]
+        assert sorted(cache.get_all()) == ["AAPL"]
+
+        await source.stop()
+
+    async def test_remove_ticker_normalizes(self):
+        cache = PriceCache()
+        source = SimulatorDataSource(price_cache=cache, update_interval=0.1)
+        await source.start(["AAPL", "TSLA"])
+
+        await source.remove_ticker(" tsla ")
+
+        assert source.get_tickers() == ["AAPL"]
+        assert cache.get("TSLA") is None
+
+        await source.stop()
+
+    async def test_start_normalizes_and_deduplicates(self):
+        cache = PriceCache()
+        source = SimulatorDataSource(price_cache=cache, update_interval=0.1)
+        await source.start([" aapl ", "AAPL", "googl"])
+
+        assert source.get_tickers() == ["AAPL", "GOOGL"]
+
         await source.stop()

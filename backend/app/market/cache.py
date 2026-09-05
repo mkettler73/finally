@@ -27,7 +27,9 @@ class PriceCache:
         If this is the first update for the ticker, previous_price == price (direction='flat').
         """
         with self._lock:
-            ts = timestamp or time.time()
+            # `or` would silently rewrite a valid 0.0 to now, masking a
+            # unit-conversion bug upstream. Test for None explicitly.
+            ts = time.time() if timestamp is None else timestamp
             prev = self._prices.get(ticker)
             previous_price = prev.price if prev else price
 
@@ -53,7 +55,8 @@ class PriceCache:
 
     def get_price(self, ticker: str) -> float | None:
         """Convenience: get just the price float, or None."""
-        update = self.get(ticker)
+        with self._lock:
+            update = self._prices.get(ticker)
         return update.price if update else None
 
     def remove(self, ticker: str) -> None:
@@ -64,7 +67,8 @@ class PriceCache:
     @property
     def version(self) -> int:
         """Current version counter. Useful for SSE change detection."""
-        return self._version
+        with self._lock:
+            return self._version
 
     def __len__(self) -> int:
         with self._lock:

@@ -28,16 +28,17 @@ Starts the market data source (simulator by default, or Massive if `MASSIVE_API_
     - `seed_prices.py` - Default ticker prices and parameters
 
 - `tests/` - Unit and integration tests
-  - `market/` - Market data tests
+  - `market/` - Market data tests, including `test_conformance.py`, which runs the
+    full `MarketDataSource` contract against every implementation
 
 ## Running Tests
 
 ```bash
 # Install dependencies
-uv sync --dev
+uv sync --extra dev
 
 # Run all tests
-uv run pytest
+uv run --extra dev pytest
 
 # Run with coverage
 uv run pytest --cov=app --cov-report=html
@@ -52,6 +53,11 @@ uv run pytest -v
 ## Environment Variables
 
 - `MASSIVE_API_KEY` - Optional. If set, use real market data from Massive API. If not set, use the built-in simulator.
+
+A free Stocks Basic key cannot call the snapshot endpoint. The client detects
+that on its first poll and falls back to end-of-day grouped-daily closes
+(refreshed every 15 minutes), logging the downgrade once. Prices are then static
+session closes rather than a live tape.
 
 ## Development
 

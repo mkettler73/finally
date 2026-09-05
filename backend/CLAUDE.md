@@ -7,6 +7,17 @@ cd backend
 uv sync --extra dev   # Install all dependencies including test/lint tools
 ```
 
+## Running the App
+
+```bash
+uv run uvicorn app.main:app --reload --port 8000
+```
+
+`app/main.py` wires the market data subsystem into a FastAPI app: a `lifespan`
+context manager creates the shared `PriceCache`, builds the data source via
+`create_market_data_source()`, starts it with `DEFAULT_TICKERS` on startup, and
+stops it on shutdown. Exposes `GET /api/health` and `GET /api/stream/prices`.
+
 ## Market Data API
 
 The market data subsystem lives in `app/market/`. Use these imports:

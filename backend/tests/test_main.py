@@ -13,6 +13,19 @@ from fastapi.testclient import TestClient
 from massive.rest.models import TickerSnapshot
 
 
+@pytest.fixture(autouse=True)
+def isolated_database(tmp_path, monkeypatch):
+    """The lifespan initialises the database, so keep it out of the repo's
+    runtime db/finally.db and give every test a fresh file."""
+    monkeypatch.setenv("FINALLY_DB_PATH", str(tmp_path / "finally.db"))
+    from app.db import reset_db_for_tests
+    from app.db.connection import close_connection
+
+    reset_db_for_tests()
+    yield
+    close_connection()
+
+
 @pytest.fixture
 def client(monkeypatch):
     # Force the simulator (no real API calls in tests).

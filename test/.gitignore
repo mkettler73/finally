@@ -1,0 +1,20 @@
+# Playwright suite — build and run artefacts.
+#
+# The root .gitignore is Python-oriented and has no node_modules rule, and
+# frontend/.gitignore only covers frontend/. Without this file, an installed
+# browser harness plus every failure trace and screenshot would be committed.
+
+# Dependencies
+/node_modules/
+
+# Run output: HTML report, JSON results, traces, screenshots, videos.
+# `results/artifacts` holds a trace.zip per failing test, which is large.
+/playwright-report/
+/results/
+/test-results/
+/blob-report/
+/.last-run.json
+
+# Browsers, if anyone installs them into the checkout rather than the image.
+/.playwright/
+/playwright/.cache/

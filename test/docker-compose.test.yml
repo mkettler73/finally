@@ -1,0 +1,89 @@
+# FinAlly — end-to-end test stack.
+#
+#   docker compose -f test/docker-compose.test.yml down -v          # clean slate
+#   docker compose -f test/docker-compose.test.yml up --build \
+#       --abort-on-container-exit --exit-code-from playwright       # run the suite
+#
+# Two services, deliberately: the app image stays exactly what ships, and every
+# browser dependency lives in the Playwright image instead. Nothing here is
+# copied into the production Dockerfile.
+#
+# `down -v` matters. The first spec asserts a pristine $10,000 balance, so the
+# database volume must be destroyed between runs.
+
+# Named so the stack does not collide with the production `docker-compose.yml`,
+# whose project name is derived from the repository directory.
+name: finally-e2e
+
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    image: finally:test
+    environment:
+      # Deterministic, offline assistant. Nothing here calls OpenRouter.
+      LLM_MOCK: "true"
+      OPENROUTER_API_KEY: ""
+      # No Massive key: the built-in simulator drives prices, so the suite has
+      # a live stream without a paid feed or a network round trip.
+      MASSIVE_API_KEY: ""
+      FINALLY_DB_PATH: /app/db/finally.db
+      FINALLY_STATIC_DIR: /app/static
+    ports:
+      # Published so the suite can also be driven from the host. 8010 rather
+      # than 8000 because 8000 is a popular port to already have taken.
+      - "${FINALLY_TEST_PORT:-8010}:8000"
+    volumes:
+      # A named volume, not a bind mount: Docker initialises it from the image
+      # and it inherits the finally:finally ownership the non-root user needs.
+      # `down -v` throws it away, which is how each run starts fresh.
+      - finally-test-data:/app/db
+    healthcheck:
+      test:
+        - CMD
+        - /app/.venv/bin/python
+        - -c
+        - import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=4).status == 200 else 1)
+      interval: 3s
+      timeout: 5s
+      retries: 20
+      start_period: 5s
+
+  playwright:
+    # Pinned to the same version as the @playwright/test dependency in
+    # package.json — a mismatch makes the runner refuse to start.
+    image: mcr.microsoft.com/playwright:v1.62.1-noble
+    depends_on:
+      app:
+        condition: service_healthy
+    # Share the app container's network namespace so the browser can reach it
+    # on loopback.
+    #
+    # This is not a convenience: Chrome silently upgrades an http:// navigation
+    # to https:// for any host that is not loopback, and there is no TLS
+    # listener on :8000. Reaching the app as `http://app:8000` therefore fails
+    # every navigation with ERR_SSL_PROTOCOL_ERROR while uvicorn logs "Invalid
+    # HTTP request received" — a total outage against a perfectly healthy
+    # server. Measured directly in this image: `app:8000` fails, `127.0.0.1:8000`
+    # returns 200, and --disable-features=HttpsUpgrades does NOT rescue the
+    # hostname form. Only loopback is exempt, so loopback is what we use.
+    #
+    # curl and Node's fetch are unaffected, which is why the API-level
+    # readiness probe passes while every browser spec fails.
+    network_mode: "service:app"
+    environment:
+      BASE_URL: http://127.0.0.1:8000
+      CI: "true"
+    working_dir: /suite
+    volumes:
+      - .:/suite
+      # Keep the container's Linux node_modules out of the host checkout, which
+      # may hold a Windows or macOS install of the same packages.
+      - playwright-node-modules:/suite/node_modules
+    command: >
+      sh -c "npm install --no-audit --no-fund && npx playwright test"
+
+volumes:
+  finally-test-data:
+  playwright-node-modules:

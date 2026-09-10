@@ -1,0 +1,41 @@
+# Convenience wrapper around the same image the start scripts build.
+#
+#   docker compose up --build -d      start
+#   docker compose down               stop (the volume, and your data, survive)
+#
+services:
+  finally:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: finally:latest
+    container_name: finally
+    ports:
+      # Override the host port with FINALLY_PORT if 8000 is taken.
+      - "${FINALLY_PORT:-8000}:8000"
+    env_file:
+      # Optional: the app runs without it (simulator market data, mock-free LLM
+      # calls will simply fail until a key is supplied).
+      - path: .env
+        required: false
+    environment:
+      FINALLY_DB_PATH: /app/db/finally.db
+      FINALLY_STATIC_DIR: /app/static
+    volumes:
+      # Named volume, not a bind mount: Docker initialises it from the image, so
+      # it inherits the finally:finally ownership the non-root user needs.
+      - finally-data:/app/db
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD
+        - /app/.venv/bin/python
+        - -c
+        - import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=4).status == 200 else 1)
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+volumes:
+  finally-data:

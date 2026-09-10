@@ -218,3 +218,11 @@ __marimo__/
 .ripgreprc
 .vscode
 .idea
+
+# FinAlly runtime SQLite database (db/ is the Docker volume mount target).
+# The directory is tracked via db/.gitkeep; the database itself never is.
+# WAL mode produces the -wal and -shm sidecars alongside it.
+db/*.db
+db/*.db-wal
+db/*.db-shm
+!db/.gitkeep

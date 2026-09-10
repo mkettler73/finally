@@ -1,0 +1,128 @@
+@import "tailwindcss";
+
+/* ---------------------------------------------------------------------------
+   FinAlly terminal tokens.
+
+   Structure is flush: panels butt against one another and are separated by a
+   single hairline, never by a gutter, a shadow or a rounded corner. Radius is
+   reserved for things you click, so roundedness reads as "interactive".
+   --------------------------------------------------------------------------- */
+@theme {
+  --color-void: #080b10; /* the grid's hairline ground, seen only 1px at a time */
+  --color-panel: #0d1117; /* every panel surface */
+  --color-rail: #121924; /* panel header rails, table headers, inputs */
+  --color-raised: #182130; /* hover, selected row */
+  --color-line: #1d2634; /* hairline */
+  --color-line-strong: #2a3547;
+
+  --color-ink: #e7edf4;
+  --color-ink-dim: #93a1b3;
+  --color-ink-mute: #5f6b7c;
+
+  /* Status pair. Validated for deuteranopia separation (ΔE 12.8) against each
+     other and for AA text contrast on --color-panel. Never used as series
+     identity, and never the only cue: every figure also carries a sign. */
+  --color-up: #1fbf92;
+  --color-down: #e04a2e;
+  --color-flat: #7c8899;
+
+  --color-accent: #ecad0a; /* state marker only: selection, focus, live edge */
+  --color-series: #209dd7; /* the single price series hue */
+  --color-submit: #753991;
+  --color-submit-hot: #8f4bb0;
+
+  --font-sans: var(--font-plex-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, "SF Mono", Menlo, monospace;
+}
+
+@layer base {
+  html,
+  body {
+    height: 100%;
+  }
+
+  body {
+    background: var(--color-void);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-size: 13px;
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+  }
+
+  /* Figures line up in columns everywhere, in both faces. */
+  .num,
+  input,
+  table {
+    font-variant-numeric: tabular-nums;
+  }
+
+  :focus-visible {
+    outline: 1px solid var(--color-accent);
+    outline-offset: 1px;
+  }
+
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-line-strong);
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #3a475c;
+  }
+}
+
+@layer components {
+  /* A panel's name, set in the terminal vernacular: terse, uppercase, tracked.
+     It labels the region rather than decorating a heading. */
+  .panel-label {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--color-ink-mute);
+  }
+}
+
+/* Price flash. The cell is remounted on each tick so the animation restarts
+   even when ticks arrive faster than it fades. */
+@keyframes flash-up {
+  from {
+    background-color: color-mix(in oklab, var(--color-up) 20%, transparent);
+    color: var(--color-up);
+  }
+  to {
+    background-color: transparent;
+  }
+}
+@keyframes flash-down {
+  from {
+    background-color: color-mix(in oklab, var(--color-down) 20%, transparent);
+    color: var(--color-down);
+  }
+  to {
+    background-color: transparent;
+  }
+}
+
+[data-flash="up"] {
+  animation: flash-up 500ms ease-out;
+}
+[data-flash="down"] {
+  animation: flash-down 500ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-flash] {
+    animation-duration: 1ms;
+  }
+  * {
+    transition-duration: 1ms !important;
+  }
+}

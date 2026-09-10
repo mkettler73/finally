@@ -1,0 +1,62 @@
+# Everything the build context does not need. Keeping this tight matters twice
+# over here: it speeds the context upload and it stops a host .venv (Windows
+# binaries) or node_modules from shadowing what the image builds itself.
+
+.git
+.github
+.gitignore
+.claude
+**/.claude
+
+# Secrets never enter the image — the container reads them at runtime via
+# --env-file / env_file.
+.env
+.env.*
+!.env.example
+
+# Python build/run artefacts
+**/__pycache__
+**/*.py[cod]
+**/.venv
+**/venv
+**/venv-wsl
+**/.pytest_cache
+**/.ruff_cache
+**/.mypy_cache
+**/.coverage
+**/htmlcov
+**/*.egg-info
+backend/tests
+backend/market_data_demo.py
+
+# Node artefacts — dependencies are installed inside the build stage
+**/node_modules
+**/.next
+**/out
+**/.turbo
+**/npm-debug.log*
+**/yarn-error.log*
+
+# Runtime data: the SQLite file lives on a volume, never in the image
+db/*.db
+db/*.db-journal
+db/*.db-wal
+db/*.db-shm
+
+# Docs, planning and test infrastructure
+planning
+test
+docs
+README.md
+LICENSE
+CLAUDE.md
+**/CLAUDE.md
+docker-compose*.yml
+Dockerfile
+.dockerignore
+
+# Editor / OS noise
+.vscode
+.idea
+**/.DS_Store
+**/Thumbs.db

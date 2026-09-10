@@ -78,10 +78,17 @@ if ! docker run -d \
     exit 1
 fi
 
-URL="http://localhost:${PORT}"
-# Probe 127.0.0.1 explicitly: on hosts where "localhost" resolves to ::1 first,
-# Docker's published port can refuse the IPv6 connection and the wait never ends.
-PROBE="http://127.0.0.1:${PORT}/api/health"
+# 127.0.0.1, not localhost, and this is the URL we print and open as well as
+# the one we probe.
+#
+# Docker reports publishing on both 0.0.0.0:PORT and [::]:PORT, but nothing
+# necessarily answers on IPv6 loopback. Where "localhost" resolves to ::1
+# first, a browser sent to http://localhost:PORT gets a connection reset from
+# a healthy, running container. Probing 127.0.0.1 while still advertising
+# localhost is the worst of both: the script reports success and hands the
+# user a dead link.
+URL="http://127.0.0.1:${PORT}"
+PROBE="${URL}/api/health"
 echo -n "==> Waiting for $URL "
 for _ in $(seq 1 60); do
     if curl -fsS "$PROBE" >/dev/null 2>&1; then

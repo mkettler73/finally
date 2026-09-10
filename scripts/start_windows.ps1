@@ -99,10 +99,17 @@ if ($LASTEXITCODE -ne 0) {
     exit 1
 }
 
-$url = "http://localhost:$Port"
-# Probe 127.0.0.1 explicitly: on hosts where "localhost" resolves to ::1 first,
-# Docker's published port can refuse the IPv6 connection and the wait never ends.
-$probe = "http://127.0.0.1:$Port/api/health"
+# 127.0.0.1, not localhost, and this is the URL we print and open as well as
+# the one we probe.
+#
+# Docker reports publishing on both 0.0.0.0:PORT and [::]:PORT, but on this
+# setup nothing actually answers on IPv6 loopback. Windows resolves "localhost"
+# to ::1 before 127.0.0.1, so a browser sent to http://localhost:PORT gets
+# ERR_CONNECTION_RESET from a healthy, running container. Probing 127.0.0.1
+# while still advertising localhost is the worst of both: the script reports
+# success and hands the user a dead link.
+$url = "http://127.0.0.1:$Port"
+$probe = "$url/api/health"
 Write-Host "==> Waiting for $url " -NoNewline
 
 foreach ($attempt in 1..60) {

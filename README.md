@@ -34,8 +34,13 @@ cp .env.example .env
 docker build -t finally .
 docker run -v finally-data:/app/db -p 8000:8000 --env-file .env finally
 
-# Open http://localhost:8000
+# Open http://127.0.0.1:8000
 ```
+
+> Use `127.0.0.1`, not `localhost`. Docker publishes the port on both IPv4 and
+> IPv6, but on some hosts nothing answers on IPv6 loopback — and Windows
+> resolves `localhost` to `::1` first, so the browser gets
+> `ERR_CONNECTION_RESET` from a container that is running perfectly well.
 
 ## Environment Variables
 
